@@ -60,7 +60,7 @@ public class OracleDataTest {
     
     // Test method to validate invoice details for a given invoice ID
     @Test(dataProvider = "invoiceData", enabled = true)
-    public void testInvoiceData(int invoiceId) {
+    public void testInvoiceData(String invoiceId) {
         // Fetch the invoice details from the database using the provided invoice ID
         Map<String, String> invoiceDetails = OracleDBUtil.getInvoiceDetailsById(invoiceId);
 

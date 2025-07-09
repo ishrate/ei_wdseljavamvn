@@ -17,6 +17,7 @@ import com.ei.pwwdseljava.onlineinvoice.pages.CbInvoiceEntry;
 import com.ei.pwwdseljava.onlineinvoice.pages.CbLogin;
 import com.ei.pwwdseljava.onlineinvoice.pages.CbQuoteInvoiceSubmit;
 import com.ei.pwwdseljava.onlineinvoice.utils.ExtentManager;
+import com.ei.pwwdseljava.onlineinvoice.utils.OracleDBUtil;
 
 public class CommBankHealth_Test extends BaseClass {
 
@@ -26,7 +27,15 @@ public class CommBankHealth_Test extends BaseClass {
 		// Fetch data using ConfigReader
 		String url = ConfigReader.get("login.url");
 		String username = ConfigReader.get("login.username");
-		String password = ConfigReader.get("login.password");
+		
+		// Debug logging
+		//System.out.println("Environment variable ENCRYPTION_SECRET_KEY: " + System.getenv("ENCRYPTION_SECRET_KEY"));
+		//System.out.println("Raw password property: " + ConfigReader.get("login.password"));
+
+		String password = ConfigReader.getPassword("login.password");
+		//System.out.println("Decrypted password: " + password);
+		
+		//String password = ConfigReader.getPassword("login.password");
 
 		return new Object[][] { { url, username, password } };
 	}
@@ -55,6 +64,7 @@ public class CommBankHealth_Test extends BaseClass {
 
 	private CbInvoiceEntry cbInvoiceEntry;
 	private CbQuoteInvoiceSubmit cbQuoteAndInvoice;
+	private String generatedInvoiceNumber; // Store invoice number to pass between test methods
 
 	private static final Logger logger = LoggerFactory.getLogger(CommBankHealth_Test.class);
 
@@ -121,7 +131,8 @@ public class CommBankHealth_Test extends BaseClass {
 
 			logger.info("Claim Number: {}, Invoice Number: {}", claimNumber, invoiceNumber);
 			test.pass("Claim Number: " + claimNumber + ", Invoice Number: " + invoiceNumber);
-
+            
+			this.generatedInvoiceNumber = invoiceNumber;
 			// Save the data as a JSON file
 			DataProviderUtil.saveInvoiceDataAsJson(invoiceNumber, claimNumber);
 
@@ -133,5 +144,70 @@ public class CommBankHealth_Test extends BaseClass {
 			throw new RuntimeException("Error during quoteInvoiceSubmitTest", e);
 		}
 	}
+	
+	// Test method to validate that Invocie is created in Tempus database
+		@Test(dependsOnMethods = { "quoteInvoiceSubmitTest" }, enabled = true)
+		public void testInvoiceData() {
+			ExtentTest test = extent.createTest("testInvoiceData");
+			try {
+				// Use the invoice number generated from quoteInvoiceSubmitTest
+				Thread.sleep(100000); // Ensure the invoice is created before fetching data
+				String invoiceNumber = this.generatedInvoiceNumber;
+
+				logger.info("Starting testInvoiceData with Invoice Number: {}", invoiceNumber);
+
+				//String invoiceId = invoiceNumber;
+
+				// Fetch the invoice details from the database
+				Map<String, String> invoiceDetails = OracleDBUtil.getInvoiceDetailsById(invoiceNumber);
+				Thread.sleep(2000);
+				logger.info("Fetched invoice details for Invoice Number: {}", invoiceNumber);
+
+				// Check if invoice details are empty - Invoice creation failed
+				if (invoiceDetails.isEmpty()) {
+					String errorMessage = "Invoice data not found in Tempus database, Invoice creation failed for Invoice Number: "
+							+ invoiceNumber;
+					logger.error(errorMessage);
+					System.out.println("-->Error: " + errorMessage);
+					ExtentManager.captureScreenshot(driver, test);
+					test.fail(errorMessage);
+					throw new RuntimeException(errorMessage);
+				}
+
+				/*
+				 * // Assert that all required fields are not null or empty
+				 * Assert.assertNotNull(invoiceDetails.get("InvoicePayeeType"),
+				 * "Invoice Payee Type is null for Invoice Number: " + invoiceNumber);
+				 * Assert.assertNotNull(invoiceDetails.get("InvoiceStatus"),
+				 * "Invoice Status is null for Invoice Number: " + invoiceNumber);
+				 * Assert.assertNotNull(invoiceDetails.get("ClaimNumber"),
+				 * "Claim Number is null for Invoice Number: " + invoiceNumber);
+				 * Assert.assertNotNull(invoiceDetails.get("InvoiceSubmittedDate"),
+				 * "Invoice Submitted Date is null for Invoice Number: " + invoiceNumber);
+				 */
+
+				// Log the retrieved values
+				logger.info("Invoice validation completed successfully for Invoice Number: {}", invoiceNumber);
+				System.out.println("Invoice Number: " + invoiceNumber);
+				System.out.println("Invoice Payee Type: " + invoiceDetails.get("InvoicePayeeType"));
+				System.out.println("Invoice Status: " + invoiceDetails.get("InvoiceStatus"));
+				System.out.println("Claim Number: " + invoiceDetails.get("ClaimNumber"));
+				System.out.println("Invoice Submitted Date: " + invoiceDetails.get("InvoiceSubmittedDate"));
+
+				test.pass("Invoice created succesfully in Tempus with Invoice Number: " + invoiceNumber + "and Status: "
+						+ invoiceDetails.get("InvoiceStatus"));
+
+			} catch (NumberFormatException e) {
+				logger.error("Invalid invoice number format: {}", this.generatedInvoiceNumber, e);
+				ExtentManager.captureScreenshot(driver, test);
+				test.fail("Invalid invoice number format: " + this.generatedInvoiceNumber);
+				throw new RuntimeException("Invalid invoice number format: " + this.generatedInvoiceNumber, e);
+			} catch (Exception e) {
+				logger.error("Error in testInvoiceData: {}", e.getMessage(), e);
+				ExtentManager.captureScreenshot(driver, test);
+				test.fail("testInvoiceData failed: " + e.getMessage());
+				throw new RuntimeException("Error during testInvoiceData", e);
+			}
+		}
 
 }

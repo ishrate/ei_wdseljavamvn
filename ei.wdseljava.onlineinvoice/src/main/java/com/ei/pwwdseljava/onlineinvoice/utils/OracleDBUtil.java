@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.ei.pwwdseljava.onlineinvoice.config.ConfigProperties;
+import com.ei.pwwdseljava.onlineinvoice.config.ConfigReader;
 
 public class OracleDBUtil {
 
@@ -14,7 +15,7 @@ public class OracleDBUtil {
     	 //System.setProperty("oracle.net.tns_admin", "C:\\3PP\\Wallet_AUTSELWEBJAVEXT");
         String url = ConfigProperties.getProperty("db.url");
         String username = ConfigProperties.getProperty("db.username");
-        String password = ConfigProperties.getProperty("db.password");
+        String password = ConfigReader.getPassword("db.password"); 
         return DriverManager.getConnection(url, username, password);
     }
 
@@ -82,15 +83,15 @@ public class OracleDBUtil {
         return result;
     }
  // Method to fetch invoice details based on the invoice ID
-    public static Map<String, String> getInvoiceDetailsById(int invoiceId) {
+    public static Map<String, String> getInvoiceDetailsById(String invoiceId) {
         Map<String, String> invoiceDetails = new HashMap<>();
 
-        String query = "SELECT INVOICE_PAYEE_TYPE, INVOICE_STATUS, CLAIM_NBR, INVOICE_SUBMITTED_DATE FROM STD_INVOICE WHERE INVOICE_ID = ?";
+        String query = "SELECT INVOICE_PAYEE_TYPE, INVOICE_STATUS, CLAIM_NBR, INVOICE_SUBMITTED_DATE FROM STD_INVOICE WHERE INVOICE_REF_NBR = ?";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(query)) {
 
-            pstmt.setInt(1, invoiceId);  // Setting the invoice ID parameter
+            pstmt.setString(1, invoiceId);  // Setting the invoice ID parameter
 
             ResultSet rs = pstmt.executeQuery();
 
